@@ -35,6 +35,21 @@ $A\subseteq\{1, ..., N\}$ and the sums $\sum_{a\in S}a$ are distinct for all $S\
 abbrev IsSumDistinctSet (A : Finset ℕ) (N : ℕ) : Prop :=
     A ⊆ Finset.Icc 1 N ∧ (fun (⟨S, _⟩ : A.powerset) => S.sum id).Injective
 
+lemma sum_distinct_card_bound (A : Finset ℕ) (N : ℕ) (h : IsSumDistinctSet A N) :
+    2 ^ A.card ≤ N * A.card + 1 := by
+  obtain ⟨h₁, h₂⟩ := h
+  have h_card : Finset.card (Finset.image (fun S : Finset ℕ => S.sum id)
+      (Finset.powerset A)) ≤ N * A.card + 1 := by
+    have h_bound : ∀ S : Finset ℕ, S ⊆ A → S.sum id ≤ N * A.card := by
+      exact fun S hS => le_trans (Finset.sum_le_sum_of_subset hS)
+        (le_trans (Finset.sum_le_sum fun x hx => Finset.mem_Icc.mp (h₁ hx) |>.2)
+          (by norm_num; nlinarith))
+    exact le_trans (Finset.card_le_card <| Finset.image_subset_iff.mpr fun S hS =>
+      Finset.mem_Icc.mpr ⟨Nat.zero_le _, h_bound S <| Finset.mem_powerset.mp hS⟩)
+      (by norm_num)
+  rwa [Finset.card_image_of_injOn, Finset.card_powerset] at h_card
+  intro x hx y hy; have := @h₂ ⟨x, hx⟩ ⟨y, hy⟩; aesop
+
 /--
 If $A\subseteq\{1, ..., N\}$ with $|A| = n$ is such that the subset sums $\sum_{a\in S}a$ are
 distinct for all $S\subseteq A$ then
@@ -53,7 +68,17 @@ The trivial lower bound is $N \gg 2^n / n$.
 @[category undergraduate, AMS 5 11]
 theorem erdos_1.variants.weaker : ∃ C > (0 : ℝ), ∀ (N : ℕ) (A : Finset ℕ)
     (_ : IsSumDistinctSet A N), N ≠ 0 → C * 2 ^ A.card / A.card < N := by
-  sorry
+    use 1 / 8, by norm_num
+    intro N A hA hN_ne_zero
+    have h_card : (2 : ℝ) ^ A.card ≤ N * A.card + 1 := by
+      exact_mod_cast sum_distinct_card_bound A N hA
+    by_cases hA_card : A.card = 0 <;> simp_all +decide
+    · positivity
+    · field_simp
+      rw [div_lt_iff₀] <;> norm_cast at * <;>
+        nlinarith [Nat.pos_of_ne_zero (show A.card ≠ 0 by aesop),
+          show (2 : ℕ) ^ A.card > A.card from Nat.recOn A.card (by norm_num) fun n ih => by
+            rw [pow_succ']; linarith [Nat.one_le_pow n 2 zero_lt_two]]
 
 /--
 Erdős and Moser [Er56] proved
@@ -140,7 +165,12 @@ https://oeis.org/A276661
 @[category research solved, AMS 5 11]
 theorem erdos_1.variants.least_N_5 :
     IsLeast { N | ∃ A, IsSumDistinctSet A N ∧ A.card = 5 } 13 := by
-  sorry
+  constructor <;> norm_num [IsSumDistinctSet]
+  · exists {6, 9, 11, 12, 13}
+  · intro N hN
+    contrapose! hN
+    simp +zetaDelta at *
+    native_decide +revert
 
 /--
 The minimal value of $N$ such that there exists a sum-distinct set with nine
